@@ -543,6 +543,25 @@ void process_instruction(){
     NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[baseRegister];
   }else if(opCode == 0x04){
     printf("JSR instruction \n");
+    int tempPCAddress = CURRENT_LATCHES.PC + 2;
+    for(int i = 0; i < 8; i++){
+        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+    }
+    NEXT_LATCHES.N = CURRENT_LATCHES.N;
+    NEXT_LATCHES.Z = CURRENT_LATCHES.Z;
+    NEXT_LATCHES.P = CURRENT_LATCHES.P;
+
+    int steeringBit = (currentInstruction & 0x0800) >> 11;
+    if(steeringBit){
+        int16_t pcOffset11 = (currentInstruction & 0x07FF);
+        if(pcOffset11 & 0x0400){
+            pcOffset11 |= 0xF800;
+        }
+        NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2 + (pcOffset11 << 1);
+        int baseRegister = (currentInstruction & 0x01C0) >> 6;
+        NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[baseRegister];
+    }
+    NEXT_LATCHES.REGS[7] = tempPCAddress;
   }else if(opCode == 0x02){
      printf("LDB instruction \n");
      int destinationRegister = (currentInstruction & 0x0E00) >> 9;
@@ -625,25 +644,106 @@ void process_instruction(){
     int sourceRegister = (currentInstruction & 0x01C0) >> 6;
     int shiftAmount = (currentInstruction & 0x000F);
     int shiftDecider = (currentInstruction & 0x0030) >> 4;
-
     for(int i = 0; i < 8; i++){
         NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
     }
     NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2;
+    
+    int16_t dRegValue = 0;
+    int sRegValue = CURRENT_LATCHES.REGS[sourceRegister];
     if(shiftDecider == 0){
-
+        dRegValue = (sRegValue << shiftDecider);
     }else if(shiftDecider == 1){
-
+        dRegValue = (sRegValue >> shiftDecider);
     }else{
-        
+        int sextVal = sRegValue & 0x8000;
+        dRegValue = (sRegValue >> shiftDecider);
+        if(sextVal){
+            int16_t shiftVal = 0xFFFF;
+            shiftVal = (shiftVal << (16-shiftDecider));
+            dRegValue |= shiftVal;
+        }
     }
+    NEXT_LATCHES.REGS[destinationRegister] = dRegValue;
   }else if(opCode == 0x03){
     printf("STB instruction \n");
+    int sourceRegister = (currentInstruction & 0x0E00) >> 9;
+    int baseRegister = (currentInstruction & 0x01C0) >> 6;
+    int16_t boffset6 = (currentInstruction & 0x003F);
+    if(boffset6 & 0x0020){
+        boffset6 |= 0xFFC0;
+    }
+    int memAddress = CURRENT_LATCHES.REGS[baseRegister] + boffset6;
+    int16_t destinationValue = (CURRENT_LATCHES.REGS[sourceRegister] & 0x00FF);
+    if(memAddress % 2 == 0){
+        MEMORY[memAddress >> 1][0] = destinationValue;
+    }else{
+        MEMORY[(memAddress-1) >> 1][1] = destinationValue;
+    }
+    
+    NEXT_LATCHES.P = CURRENT_LATCHES.P;
+    NEXT_LATCHES.Z = CURRENT_LATCHES.Z;
+    NEXT_LATCHES.N = CURRENT_LATCHES.N;
+   
+    for(int i = 0; i < 8; i++){
+        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+    }
+    NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2;
   }else if(opCode == 0x07){
     printf("STW instruction \n");
+    int sourceRegister = (currentInstruction & 0x0E00) >> 9;
+    int baseRegister = (currentInstruction & 0x01C0) >> 6;
+    int16_t boffset6 = (currentInstruction & 0x003F);
+    if(boffset6 & 0x0020){
+        boffset6 |= 0xFFC0;
+    }
+    int memAddress = CURRENT_LATCHES.REGS[baseRegister] + (boffset6 << 1);
+    int16_t destinationValue = (CURRENT_LATCHES.REGS[sourceRegister]);
+    MEMORY[memAddress >> 1][0] = destinationValue & 0x00FF;
+    MEMORY[memAddress >> 1][1] = destinationValue & 0xFF00;
+
+    NEXT_LATCHES.P = CURRENT_LATCHES.P;
+    NEXT_LATCHES.Z = CURRENT_LATCHES.Z;
+    NEXT_LATCHES.N = CURRENT_LATCHES.N;
+   
+    for(int i = 0; i < 8; i++){
+        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+    }
+    NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2;
   }else if(opCode == 0x0F){
     printf("TRAP instruction \n");
+    int16_t trapVector = (currentInstruction & 0x00FF);
+    for(int i = 0; i < 8; i++){
+        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+    }
+    NEXT_LATCHES.REGS[7] = CURRENT_LATCHES.PC;
+    NEXT_LATCHES.N = CURRENT_LATCHES.N;
+    NEXT_LATCHES.P = CURRENT_LATCHES.P;
+    NEXT_LATCHES.Z = CURRENT_LATCHES.Z;
+
+    int trapVectorAddress = (trapVector << 1);
+    NEXT_LATCHES.PC = MEMORY[trapVectorAddress >> 1];
   }else if(opCode == 0x09){
      printf("XOR/NOT instruction \n");
+     int destinationRegister = (currentInstruction & 0x0E00) >> 9;
+     int sourceRegister1 = (currentInstruction & 0x01C0) >> 6;
+     int steeringBit = (currentInstruction & 0x0020) >> 5;
+     for(int i = 0; i < 8; i++){
+         NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+     }
+     NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2;
+     if(!steeringBit){
+         int sourceRegister2 = (currentInstruction & 0x0007);
+         int sRegVal1 = CURRENT_LATCHES.REGS[sourceRegister1];
+         int sRegVal2 = CURRENT_LATCHES.REGS[sourceRegister2];
+         NEXT_LATCHES.REGS[destinationRegister] = sRegVal1 & sRegVal2;
+     }else{
+         int16_t sRegVal1 = CURRENT_LATCHES.REGS[sourceRegister1];
+         int16_t immVal = (currentInstruction & 0x001F);
+         if(immVal & 0x0010){
+             immVal |= 0xFE00;
+         }
+         NEXT_LATCHES.REGS[destinationRegister] = sRegVal1 & immVal;
+     }
   }    
 }
