@@ -50,3 +50,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Lab 2 specific files
+assembler.linux
+*.asm
+*.obj
+dumpsim 
