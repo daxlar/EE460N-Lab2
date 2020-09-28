@@ -533,7 +533,7 @@ void process_instruction(){
     }
   }else if(opCode == 0x0C){
     printf("JMP instruction \n");
-    int baseRegister = (currentInstruction & 0x01E0) >> 6;
+    int baseRegister = (currentInstruction & 0x01C0) >> 6;
     NEXT_LATCHES.N = CURRENT_LATCHES.N;
     NEXT_LATCHES.Z = CURRENT_LATCHES.Z;
     NEXT_LATCHES.P = CURRENT_LATCHES.P;
